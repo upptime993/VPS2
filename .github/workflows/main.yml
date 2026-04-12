@@ -10,7 +10,7 @@ jobs:
 
     steps:
       # ============================================
-      # STEP 1: Setup Python (cached di runner, cepat)
+      # STEP 1: Setup Python (cached di runner)
       # ============================================
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -23,7 +23,7 @@ jobs:
           pip --version
 
       # ============================================
-      # STEP 2: Setup Node.js (cached di runner, cepat)
+      # STEP 2: Setup Node.js (cached di runner)
       # ============================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,22 +74,20 @@ jobs:
           Write-Host "VS Code installed!"
 
       # ============================================
-      # STEP 5: Install Google Antigravity IDE (Resmi Google)
+      # STEP 5: Install Google Antigravity IDE
+      # URL dari Google's edge CDN (edgedl.me.gvt1.com) - verified via Chocolatey package
+      # Ini adalah CDN resmi Google untuk distribusi software
       # ============================================
       - name: Install Google Antigravity IDE
         run: |
-          Write-Host "Downloading Google Antigravity from antigravity.google..."
-          $url = "https://antigravity.google/download/win/x64/stable/AntigravitySetup.exe"
+          Write-Host "Downloading Google Antigravity dari Google CDN..."
+          $url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.21.9-4905428782546944/windows-x64/Antigravity.exe"
           $out = "$env:TEMP\AntigravitySetup.exe"
-          try {
-            Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
-            Write-Host "Download success!"
-          } catch {
-            Write-Host "Trying fallback URL..."
-            Invoke-WebRequest -Uri "https://antigravity.google/download/AntigravitySetup.exe" -OutFile $out -UseBasicParsing
-          }
-          Start-Process -FilePath $out -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ALLUSERS /SP-" -Wait -NoNewWindow
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          Write-Host "Download selesai! Installing..."
+          Start-Process -FilePath $out -ArgumentList "/S /VERYSILENT /SUPPRESSMSGBOXES /norestart /quiet /SP-" -Wait -NoNewWindow
           Remove-Item $out -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 5
           $exePath1 = "${env:ProgramFiles}\Google\Antigravity\Antigravity.exe"
           $exePath2 = "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe"
           $finalExe = if (Test-Path $exePath1) { $exePath1 } elseif (Test-Path $exePath2) { $exePath2 } else { $null }
@@ -101,14 +99,13 @@ jobs:
             $sc.Save()
             Write-Host "Antigravity installed! Shortcut ada di Desktop."
           } else {
-            Write-Host "WARNING: Antigravity.exe tidak ditemukan. Cek manual setelah RDP."
+            Write-Host "WARNING: Antigravity.exe tidak ditemukan. Cek manual setelah RDP connect."
           }
 
       # ============================================
       # STEP 6: Install Android SDK + Buat AVD
-      # CATATAN: Hyper-V tidak bisa di GitHub runner (VM environment)
-      # Emulator pakai -gpu swiftshader_indirect (software rendering)
-      # Ini sudah cukup untuk testing aplikasi Android
+      # Hyper-V tidak tersedia di GitHub runner (nested VM)
+      # Emulator tetap bisa jalan pakai software rendering (swiftshader)
       # ============================================
       - name: Install Android SDK and Create AVD
         run: |
@@ -144,7 +141,6 @@ jobs:
           $avdmanager = "$sdkBin\avdmanager.bat"
           "no" | & $avdmanager create avd --name "TestDevice" --package "system-images;android-33;google_apis;x86_64" --device "pixel_6" --force 2>&1
 
-          # Launcher pakai software rendering (swiftshader) karena Hyper-V tidak tersedia di VM runner
           $batFile = "C:\Users\Public\Desktop\Start-Android-Emulator.bat"
           "set ANDROID_HOME=C:\Android" | Out-File -FilePath $batFile -Encoding ASCII
           "set PATH=%PATH%;C:\Android\emulator;C:\Android\platform-tools" | Add-Content -Path $batFile
@@ -152,7 +148,6 @@ jobs:
 
           Remove-Item $sdkZip -Force
           Write-Host "Android SDK ready! AVD: TestDevice (Android 13, Pixel 6)"
-          Write-Host "Jalankan emulator dari Desktop: Start-Android-Emulator.bat"
 
       # ============================================
       # STEP 7: Install Tailscale
@@ -191,13 +186,13 @@ jobs:
       # ============================================
       - name: Verify RDP Accessibility
         run: |
-          Write-Host "Testing RDP connection to $env:TAILSCALE_IP ..."
+          Write-Host "Testing RDP ke $env:TAILSCALE_IP ..."
           $test = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
           if (-not $test.TcpTestSucceeded) {
             Write-Error "RDP port 3389 tidak bisa diakses!"
             exit 1
           }
-          Write-Host "RDP port 3389 OK! Siap connect."
+          Write-Host "RDP port 3389 OK!"
 
       # ============================================
       # STEP 9: Maintain Connection
@@ -215,16 +210,16 @@ jobs:
           Write-Host "    [OK] Python 3.13"
           Write-Host "    [OK] Node.js 22 LTS"
           Write-Host "    [OK] Visual Studio Code"
-          Write-Host "    [OK] Google Antigravity IDE"
+          Write-Host "    [OK] Google Antigravity IDE (login Gmail setelah buka)"
           Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
           Write-Host "    [OK] Tailscale VPN"
           Write-Host ""
           Write-Host "  Cara jalankan Android Emulator:"
           Write-Host "    Klik 2x Start-Android-Emulator.bat di Desktop"
-          Write-Host "    (pakai software rendering, tidak butuh Hyper-V)"
+          Write-Host "    (software rendering, tidak butuh Hyper-V)"
           Write-Host ""
           Write-Host "  Cara buka Antigravity:"
-          Write-Host "    Klik shortcut Antigravity di Desktop, login Gmail"
+          Write-Host "    Klik shortcut Antigravity di Desktop, lalu login Gmail"
           Write-Host "============================================================"
           while ($true) {
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif..."
