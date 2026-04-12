@@ -41,7 +41,23 @@ jobs:
           echo "RDP_PASS=$password" >> $env:GITHUB_ENV
 
       # ============================================
-      # STEP 2: Install Python Versi Terbaru
+      # STEP 2: Aktifkan Virtualisasi (Untuk Emulator)
+      # ============================================
+      - name: Enable Hyper-V and Virtualization Features
+        run: |
+          Write-Host "========================================="
+          Write-Host "  Enabling Virtualization Features..."
+          Write-Host "========================================="
+
+          # Aktifkan semua fitur Hyper-V & Hypervisor tanpa restart
+          DISM /Online /Enable-Feature /FeatureName:Microsoft-Hyper-V-All /All /NoRestart /Quiet
+          DISM /Online /Enable-Feature /FeatureName:HypervisorPlatform /All /NoRestart /Quiet
+          DISM /Online /Enable-Feature /FeatureName:VirtualMachinePlatform /All /NoRestart /Quiet
+
+          Write-Host "Virtualization features enabled (no restart needed)!"
+
+      # ============================================
+      # STEP 3: Install Python Versi Terbaru
       # ============================================
       - name: Install Python Latest Version
         run: |
@@ -49,7 +65,6 @@ jobs:
           Write-Host "  Installing Python Latest Version..."
           Write-Host "========================================="
 
-          # Download Python 3.13 installer dari python.org
           $pythonUrl = "https://www.python.org/ftp/python/3.13.4/python-3.13.4-amd64.exe"
           $installerPath = "$env:TEMP\python-installer.exe"
 
@@ -68,18 +83,97 @@ jobs:
 
           Remove-Item $installerPath -Force
 
-          # Refresh PATH agar Python terdeteksi
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
                       [System.Environment]::GetEnvironmentVariable("Path", "User")
 
-          # Verifikasi instalasi
           Write-Host "`n--- Verifikasi Python ---"
           python --version
           pip --version
           Write-Host "Python installed successfully!`n"
 
       # ============================================
-      # STEP 3: Install Visual Studio Code
+      # STEP 4: Install Node.js (Dibutuhkan Antigravity & Android tools)
+      # ============================================
+      - name: Install Node.js
+        run: |
+          Write-Host "========================================="
+          Write-Host "  Installing Node.js LTS..."
+          Write-Host "========================================="
+
+          $nodeUrl = "https://nodejs.org/dist/lts/node-v22.15.0-x64.msi"
+          $installerPath = "$env:TEMP\nodejs.msi"
+
+          Invoke-WebRequest -Uri $nodeUrl -OutFile $installerPath -UseBasicParsing
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
+
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
+                      [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+          Write-Host "Node.js installed!"
+          node --version
+          npm --version
+
+      # ============================================
+      # STEP 5: Install Google Antigravity IDE (Resmi)
+      # ============================================
+      - name: Install Google Antigravity IDE
+        run: |
+          Write-Host "========================================="
+          Write-Host "  Installing Google Antigravity IDE..."
+          Write-Host "  (Official from antigravity.google)"
+          Write-Host "========================================="
+
+          # Download installer resmi dari Google
+          $antigravityUrl = "https://antigravity.google/download/win/x64/stable/AntigravitySetup.exe"
+          $installerPath = "$env:TEMP\AntigravitySetup.exe"
+
+          Write-Host "Downloading Antigravity from official Google source..."
+          try {
+            Invoke-WebRequest -Uri $antigravityUrl -OutFile $installerPath -UseBasicParsing
+            Write-Host "Download successful!"
+          } catch {
+            # Fallback URL alternatif
+            Write-Host "Primary URL failed, trying alternative..."
+            $antigravityUrl = "https://antigravity.google/download/AntigravitySetup.exe"
+            Invoke-WebRequest -Uri $antigravityUrl -OutFile $installerPath -UseBasicParsing
+          }
+
+          # Install diam-diam (silent install) — sama seperti VSCode installer behavior
+          Write-Host "Running Antigravity installer silently..."
+          Start-Process -FilePath $installerPath -ArgumentList `
+            "/VERYSILENT", `
+            "/SUPPRESSMSGBOXES", `
+            "/NORESTART", `
+            "/ALLUSERS", `
+            "/SP-" `
+            -Wait -NoNewWindow
+
+          Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+
+          # Buat shortcut di desktop Public agar bisa diakses via RDP
+          $antigravityExe = "${env:ProgramFiles}\Google\Antigravity\Antigravity.exe"
+          if (-not (Test-Path $antigravityExe)) {
+            # Cek path alternatif (per-user install)
+            $antigravityExe = "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe"
+          }
+
+          if (Test-Path $antigravityExe) {
+            $shell = New-Object -ComObject WScript.Shell
+            $shortcut = $shell.CreateShortcut("C:\Users\Public\Desktop\Antigravity.lnk")
+            $shortcut.TargetPath = $antigravityExe
+            $shortcut.Description = "Google Antigravity AI IDE"
+            $shortcut.Save()
+            Write-Host "Antigravity installed and shortcut created at Desktop!"
+          } else {
+            Write-Host "WARNING: Antigravity executable not found at expected path."
+            Write-Host "Cek manual di: $env:ProgramFiles\Google\ atau $env:LOCALAPPDATA\Programs\"
+          }
+
+          Write-Host "Google Antigravity installed successfully!`n"
+
+      # ============================================
+      # STEP 6: Install Visual Studio Code
       # ============================================
       - name: Install Visual Studio Code
         run: |
@@ -87,14 +181,11 @@ jobs:
           Write-Host "  Installing Visual Studio Code..."
           Write-Host "========================================="
 
-          # Download VS Code System Installer (agar tersedia untuk semua user di RDP)
           $vscodeUrl = "https://update.code.visualstudio.com/latest/win32-x64/stable"
           $installerPath = "$env:TEMP\vscode-installer.exe"
 
-          Write-Host "Downloading VS Code..."
           Invoke-WebRequest -Uri $vscodeUrl -OutFile $installerPath -UseBasicParsing
 
-          Write-Host "Running VS Code installer..."
           Start-Process -FilePath $installerPath -ArgumentList `
             "/verysilent", `
             "/norestart", `
@@ -103,99 +194,90 @@ jobs:
 
           Remove-Item $installerPath -Force
 
-          # Refresh PATH
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
                       [System.Environment]::GetEnvironmentVariable("Path", "User")
 
           Write-Host "VS Code installed successfully!"
 
       # ============================================
-      # STEP 4: Install VS Code Extensions (Python & AI)
+      # STEP 7: Install Android SDK + Emulator (Tanpa Restart)
       # ============================================
-      - name: Install VS Code Extensions
+      - name: Install Android SDK & Create AVD Emulator
         run: |
-          Write-Host "Installing VS Code extensions..."
+          Write-Host "========================================="
+          Write-Host "  Installing Android SDK & Emulator..."
+          Write-Host "========================================="
 
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
-                      [System.Environment]::GetEnvironmentVariable("Path", "User")
+          $androidHome = "C:\Android"
+          $sdkUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+          $sdkZip = "$env:TEMP\cmdtools.zip"
 
-          $codePath = "${env:ProgramFiles}\Microsoft VS Code\bin\code.cmd"
+          # Download Android Command Line Tools
+          Write-Host "Downloading Android SDK Command Line Tools..."
+          Invoke-WebRequest -Uri $sdkUrl -OutFile $sdkZip -UseBasicParsing
 
-          if (Test-Path $codePath) {
-              # Python extension
-              & $codePath --install-extension ms-python.python --force 2>$null
-              # Pylance (IntelliSense)
-              & $codePath --install-extension ms-python.vscode-pylance --force 2>$null
-              # Google Cloud Code (termasuk Gemini AI assistant)
-              & $codePath --install-extension GoogleCloudTools.cloudcode --force 2>$null
-              # Jupyter Notebooks
-              & $codePath --install-extension ms-toolsai.jupyter --force 2>$null
+          # Extract
+          New-Item -ItemType Directory -Path "$androidHome\cmdline-tools" -Force | Out-Null
+          Expand-Archive $sdkZip -DestinationPath "$androidHome\cmdline-tools" -Force
 
-              Write-Host "VS Code extensions installed!"
-          } else {
-              Write-Host "WARNING: VS Code CLI not found at expected path, skipping extensions"
+          # Android SDK tools hasil extract ada di subfolder "cmdline-tools"
+          # Rename ke "latest" sesuai struktur yang dibutuhkan
+          $extractedPath = "$androidHome\cmdline-tools\cmdline-tools"
+          if (Test-Path $extractedPath) {
+            Rename-Item $extractedPath "$androidHome\cmdline-tools\latest" -Force
           }
 
-      # ============================================
-      # STEP 5: Install Google Generative AI SDK
-      # ============================================
-      - name: Install Google Generative AI SDK (Antigravity AI)
-        run: |
-          Write-Host "========================================="
-          Write-Host "  Installing Google AI Packages..."
-          Write-Host "========================================="
+          # Set environment variables
+          [System.Environment]::SetEnvironmentVariable("ANDROID_HOME", $androidHome, "Machine")
+          [System.Environment]::SetEnvironmentVariable("ANDROID_SDK_ROOT", $androidHome, "Machine")
 
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
-                      [System.Environment]::GetEnvironmentVariable("Path", "User")
+          $env:ANDROID_HOME = $androidHome
+          $env:ANDROID_SDK_ROOT = $androidHome
+          $env:Path += ";$androidHome\cmdline-tools\latest\bin;$androidHome\platform-tools;$androidHome\emulator"
 
-          Write-Host "Upgrading pip..."
-          python -m pip install --upgrade pip
+          $sdkmanager = "$androidHome\cmdline-tools\latest\bin\sdkmanager.bat"
 
-          Write-Host "`nInstalling Google Generative AI SDK (Gemini)..."
-          pip install --upgrade google-generativeai
+          # Accept semua lisensi otomatis
+          Write-Host "Accepting Android SDK licenses..."
+          for ($i = 0; $i -lt 10; $i++) { echo "y" } | & $sdkmanager --licenses
 
-          Write-Host "`nInstalling Google Cloud AI Platform..."
-          pip install --upgrade google-cloud-aiplatform
+          # Install komponen SDK
+          Write-Host "Installing Android emulator & system image (Android 13, x86_64)..."
+          & $sdkmanager `
+            "emulator" `
+            "platform-tools" `
+            "platforms;android-33" `
+            "system-images;android-33;google_apis;x86_64"
 
-          Write-Host "`nInstalling additional useful AI packages..."
-          pip install --upgrade google-auth google-api-python-client
+          # Buat AVD (Android Virtual Device)
+          Write-Host "Creating AVD: TestDevice..."
+          $avdmanager = "$androidHome\cmdline-tools\latest\bin\avdmanager.bat"
+          echo "no" | & $avdmanager create avd `
+            --name "TestDevice" `
+            --package "system-images;android-33;google_apis;x86_64" `
+            --device "pixel_6" `
+            --force
 
-          # Verifikasi
-          Write-Host "`n--- Verifikasi Google AI SDK ---"
-          python -c "import google.generativeai as genai; print('google-generativeai version:', genai.__version__)"
-          Write-Host "Google AI SDK installed successfully!`n"
+          # Buat shortcut script untuk jalankan emulator
+          $launchScript = @"
+@echo off
+echo Starting Android Emulator (TestDevice)...
+set ANDROID_HOME=C:\Android
+set PATH=%PATH%;C:\Android\emulator;C:\Android\platform-tools
+emulator -avd TestDevice -no-snapshot-load -gpu swiftshader_indirect -no-audio
+"@
+          $launchScript | Out-File -FilePath "C:\Users\Public\Desktop\Start-Android-Emulator.bat" -Encoding ASCII
 
-          # Buat sample script di Desktop agar mudah diakses via RDP
-          $sampleScript = @"
-          # ============================================
-          # Google Gemini AI - Sample Script
-          # ============================================
-          # Jalankan: python gemini_sample.py
-          #
-          # Set API key Anda terlebih dahulu:
-          #   set GOOGLE_API_KEY=your-api-key-here
-          #
-          # Dapatkan API key gratis di:
-          #   https://aistudio.google.com/apikey
-          # ============================================
+          Write-Host "Android Emulator setup complete!"
+          Write-Host "  -> AVD Name   : TestDevice"
+          Write-Host "  -> Android    : 13 (API 33)"
+          Write-Host "  -> Device     : Pixel 6"
+          Write-Host "  -> Shortcut   : Desktop/Start-Android-Emulator.bat"
 
-          import google.generativeai as genai
-          import os
-
-          api_key = os.environ.get("GOOGLE_API_KEY", "YOUR_API_KEY_HERE")
-          genai.configure(api_key=api_key)
-
-          model = genai.GenerativeModel("gemini-2.0-flash")
-          response = model.generate_content("Jelaskan apa itu AI dalam 3 kalimat bahasa Indonesia.")
-          print(response.text)
-          "@
-
-          $desktopPath = "C:\Users\Public\Desktop"
-          $sampleScript | Out-File -FilePath "$desktopPath\gemini_sample.py" -Encoding UTF8
-          Write-Host "Sample script saved to $desktopPath\gemini_sample.py"
+          Remove-Item $sdkZip -Force
 
       # ============================================
-      # STEP 6: Install Tailscale & Connect
+      # STEP 8: Install Tailscale & Connect
       # ============================================
       - name: Install Tailscale
         run: |
@@ -233,7 +315,7 @@ jobs:
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       # ============================================
-      # STEP 7: Verifikasi & Jalankan
+      # STEP 9: Verifikasi RDP
       # ============================================
       - name: Verify RDP Accessibility
         run: |
@@ -245,6 +327,9 @@ jobs:
           }
           Write-Host "TCP connectivity successful!"
 
+      # ============================================
+      # STEP 10: Maintain Connection & Print Info
+      # ============================================
       - name: Maintain Connection
         run: |
           Write-Host ""
@@ -259,15 +344,21 @@ jobs:
           Write-Host ""
           Write-Host "  Installed Software:"
           Write-Host "    [OK] Python 3.13 (latest)"
-          Write-Host "    [OK] Visual Studio Code + Extensions"
-          Write-Host "    [OK] Google Generative AI SDK (Gemini)"
-          Write-Host "    [OK] Google Cloud AI Platform SDK"
+          Write-Host "    [OK] Node.js LTS"
+          Write-Host "    [OK] Visual Studio Code"
+          Write-Host "    [OK] Google Antigravity IDE (Official)"
+          Write-Host "    [OK] Android SDK + Emulator (TestDevice - API 33)"
           Write-Host "    [OK] Tailscale VPN"
           Write-Host ""
-          Write-Host "  Quick Start:"
-          Write-Host "    - Buka VS Code dari Desktop atau Start Menu"
-          Write-Host "    - Sample script Gemini ada di Desktop"
-          Write-Host "    - Set API key: set GOOGLE_API_KEY=xxx"
+          Write-Host "  Cara Jalankan Android Emulator:"
+          Write-Host "    -> Klik 2x 'Start-Android-Emulator.bat' di Desktop"
+          Write-Host "    -> Atau buka Terminal dan ketik:"
+          Write-Host "       C:\Android\emulator\emulator -avd TestDevice -gpu swiftshader_indirect"
+          Write-Host ""
+          Write-Host "  Cara Buka Antigravity:"
+          Write-Host "    -> Klik 2x shortcut 'Antigravity' di Desktop"
+          Write-Host "    -> Login dengan akun Gmail personal"
+          Write-Host "    -> Pilih model: Gemini 3 Pro (gratis)"
           Write-Host ""
           Write-Host "============================================================"
           Write-Host ""
