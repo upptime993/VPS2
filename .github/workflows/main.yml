@@ -10,8 +10,7 @@ jobs:
 
     steps:
       # ============================================
-      # STEP 1: Setup Python (sudah pre-installed di runner)
-      # Pakai actions/setup-python, TIDAK download manual
+      # STEP 1: Setup Python (cached di runner, cepat)
       # ============================================
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -24,8 +23,7 @@ jobs:
           pip --version
 
       # ============================================
-      # STEP 2: Setup Node.js (sudah pre-installed di runner)
-      # Pakai actions/setup-node, TIDAK download MSI
+      # STEP 2: Setup Node.js (cached di runner, cepat)
       # ============================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -61,19 +59,7 @@ jobs:
           echo "RDP_PASS=$password" >> $env:GITHUB_ENV
 
       # ============================================
-      # STEP 4: Aktifkan Virtualisasi (Untuk Emulator Android)
-      # ============================================
-      - name: Enable Virtualization Features
-        run: |
-          Write-Host "Enabling Hyper-V and virtualization..."
-          DISM /Online /Enable-Feature /FeatureName:Microsoft-Hyper-V-All /All /NoRestart /Quiet
-          DISM /Online /Enable-Feature /FeatureName:HypervisorPlatform /All /NoRestart /Quiet
-          DISM /Online /Enable-Feature /FeatureName:VirtualMachinePlatform /All /NoRestart /Quiet
-          Write-Host "Virtualization enabled!"
-
-      # ============================================
-      # STEP 5: Install Visual Studio Code
-      # URL verified: update.code.visualstudio.com adalah CDN resmi Microsoft
+      # STEP 4: Install Visual Studio Code
       # ============================================
       - name: Install Visual Studio Code
         run: |
@@ -81,19 +67,18 @@ jobs:
           $url = "https://update.code.visualstudio.com/latest/win32-x64/stable"
           $out = "$env:TEMP\vscode.exe"
           Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
-          Write-Host "Installing VS Code silently..."
+          Write-Host "Installing VS Code..."
           Start-Process -FilePath $out -ArgumentList "/verysilent /norestart /mergetasks=!runcode,addtopath,desktopicon" -Wait -NoNewWindow
           Remove-Item $out -Force
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
           Write-Host "VS Code installed!"
 
       # ============================================
-      # STEP 6: Install Google Antigravity IDE (Resmi)
-      # Download dari antigravity.google - IDE Agent resmi Google
+      # STEP 5: Install Google Antigravity IDE (Resmi Google)
       # ============================================
       - name: Install Google Antigravity IDE
         run: |
-          Write-Host "Downloading Google Antigravity IDE from official source..."
+          Write-Host "Downloading Google Antigravity from antigravity.google..."
           $url = "https://antigravity.google/download/win/x64/stable/AntigravitySetup.exe"
           $out = "$env:TEMP\AntigravitySetup.exe"
           try {
@@ -101,10 +86,8 @@ jobs:
             Write-Host "Download success!"
           } catch {
             Write-Host "Trying fallback URL..."
-            $url = "https://antigravity.google/download/AntigravitySetup.exe"
-            Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+            Invoke-WebRequest -Uri "https://antigravity.google/download/AntigravitySetup.exe" -OutFile $out -UseBasicParsing
           }
-          Write-Host "Installing Antigravity silently..."
           Start-Process -FilePath $out -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /ALLUSERS /SP-" -Wait -NoNewWindow
           Remove-Item $out -Force -ErrorAction SilentlyContinue
           $exePath1 = "${env:ProgramFiles}\Google\Antigravity\Antigravity.exe"
@@ -116,15 +99,16 @@ jobs:
             $sc.TargetPath = $finalExe
             $sc.Description = "Google Antigravity AI IDE"
             $sc.Save()
-            Write-Host "Antigravity installed! Shortcut on Desktop."
+            Write-Host "Antigravity installed! Shortcut ada di Desktop."
           } else {
-            Write-Host "WARNING: Antigravity .exe not found after install. Login via RDP and check manually."
+            Write-Host "WARNING: Antigravity.exe tidak ditemukan. Cek manual setelah RDP."
           }
 
       # ============================================
-      # STEP 7: Install Android SDK + Buat Emulator AVD
-      # URL SDK tools: verified dari dl.google.com (official)
-      # Versi: commandlinetools-win-11076708 (stable)
+      # STEP 6: Install Android SDK + Buat AVD
+      # CATATAN: Hyper-V tidak bisa di GitHub runner (VM environment)
+      # Emulator pakai -gpu swiftshader_indirect (software rendering)
+      # Ini sudah cukup untuk testing aplikasi Android
       # ============================================
       - name: Install Android SDK and Create AVD
         run: |
@@ -134,7 +118,6 @@ jobs:
           $sdkUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
 
           Invoke-WebRequest -Uri $sdkUrl -OutFile $sdkZip -UseBasicParsing
-          Write-Host "Extracting SDK tools..."
           New-Item -ItemType Directory -Path "$androidHome\cmdline-tools" -Force | Out-Null
           Expand-Archive -Path $sdkZip -DestinationPath "$androidHome\cmdline-tools" -Force
 
@@ -154,24 +137,25 @@ jobs:
           Write-Host "Accepting SDK licenses..."
           for ($i = 0; $i -lt 10; $i++) { "y" } | & $sdkmanager --licenses 2>&1 | Out-Null
 
-          Write-Host "Installing Android emulator + system image (Android 13)..."
+          Write-Host "Installing emulator + system image Android 13..."
           & $sdkmanager "emulator" "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64" 2>&1
 
           Write-Host "Creating AVD: TestDevice..."
           $avdmanager = "$sdkBin\avdmanager.bat"
           "no" | & $avdmanager create avd --name "TestDevice" --package "system-images;android-33;google_apis;x86_64" --device "pixel_6" --force 2>&1
 
+          # Launcher pakai software rendering (swiftshader) karena Hyper-V tidak tersedia di VM runner
           $batFile = "C:\Users\Public\Desktop\Start-Android-Emulator.bat"
           "set ANDROID_HOME=C:\Android" | Out-File -FilePath $batFile -Encoding ASCII
           "set PATH=%PATH%;C:\Android\emulator;C:\Android\platform-tools" | Add-Content -Path $batFile
-          "emulator -avd TestDevice -no-snapshot-load -gpu swiftshader_indirect -no-audio" | Add-Content -Path $batFile
+          "emulator -avd TestDevice -no-snapshot-load -gpu swiftshader_indirect -no-audio -no-boot-anim" | Add-Content -Path $batFile
 
           Remove-Item $sdkZip -Force
-          Write-Host "Android Emulator ready! AVD: TestDevice (Android 13, Pixel 6)"
+          Write-Host "Android SDK ready! AVD: TestDevice (Android 13, Pixel 6)"
+          Write-Host "Jalankan emulator dari Desktop: Start-Android-Emulator.bat"
 
       # ============================================
-      # STEP 8: Install Tailscale
-      # URL: verified dari pkgs.tailscale.com (official)
+      # STEP 7: Install Tailscale
       # ============================================
       - name: Install Tailscale
         run: |
@@ -197,51 +181,53 @@ jobs:
             $retries++
           }
           if (-not $tsIP) {
-            Write-Error "Tailscale IP tidak dapat diperoleh. Cek authkey."
+            Write-Error "Tailscale IP tidak dapat diperoleh. Cek authkey di Secrets."
             exit 1
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       # ============================================
-      # STEP 9: Verifikasi RDP
+      # STEP 8: Verifikasi RDP
       # ============================================
       - name: Verify RDP Accessibility
         run: |
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
+          Write-Host "Testing RDP connection to $env:TAILSCALE_IP ..."
           $test = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
           if (-not $test.TcpTestSucceeded) {
             Write-Error "RDP port 3389 tidak bisa diakses!"
             exit 1
           }
-          Write-Host "RDP port 3389 OK!"
+          Write-Host "RDP port 3389 OK! Siap connect."
 
       # ============================================
-      # STEP 10: Maintain Connection (loop sampai timeout 6 jam)
+      # STEP 9: Maintain Connection
       # ============================================
       - name: Maintain Connection
         run: |
           Write-Host "============================================================"
-          Write-Host "               RDP ACCESS READY - CONNECT NOW"
+          Write-Host "            RDP SIAP - SILAKAN CONNECT SEKARANG"
           Write-Host "============================================================"
           Write-Host "  Address  : $env:TAILSCALE_IP"
           Write-Host "  Username : $env:RDP_USER"
           Write-Host "  Password : $env:RDP_PASS"
           Write-Host ""
-          Write-Host "  Software yang terinstall:"
+          Write-Host "  Software terinstall:"
           Write-Host "    [OK] Python 3.13"
           Write-Host "    [OK] Node.js 22 LTS"
           Write-Host "    [OK] Visual Studio Code"
-          Write-Host "    [OK] Google Antigravity IDE (login Gmail setelah buka)"
-          Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 / Pixel 6)"
+          Write-Host "    [OK] Google Antigravity IDE"
+          Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
           Write-Host "    [OK] Tailscale VPN"
           Write-Host ""
-          Write-Host "  Cara jalankan Emulator Android:"
-          Write-Host "    Klik 2x 'Start-Android-Emulator.bat' di Desktop"
+          Write-Host "  Cara jalankan Android Emulator:"
+          Write-Host "    Klik 2x Start-Android-Emulator.bat di Desktop"
+          Write-Host "    (pakai software rendering, tidak butuh Hyper-V)"
+          Write-Host ""
           Write-Host "  Cara buka Antigravity:"
-          Write-Host "    Klik shortcut 'Antigravity' di Desktop, lalu login Gmail"
+          Write-Host "    Klik shortcut Antigravity di Desktop, login Gmail"
           Write-Host "============================================================"
           while ($true) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif - stop dengan cancel workflow"
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif..."
             Start-Sleep -Seconds 300
           }
           
