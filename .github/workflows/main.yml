@@ -74,33 +74,33 @@ jobs:
           Write-Host "VS Code installed!"
 
       # ============================================
-      # STEP 5: Install Google Antigravity IDE
-      # URL dari Google's edge CDN (edgedl.me.gvt1.com) - verified via Chocolatey package
-      # Ini adalah CDN resmi Google untuk distribusi software
+      # STEP 5: Buat script install Antigravity di Desktop
+      # Antigravity TIDAK diinstall saat workflow (terlalu lambat ~500MB)
+      # Cukup klik 2x file bat ini setelah RDP connect
       # ============================================
-      - name: Install Google Antigravity IDE
+      - name: Create Antigravity Installer Script on Desktop
         run: |
-          Write-Host "Downloading Google Antigravity dari Google CDN..."
-          $url = "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.21.9-4905428782546944/windows-x64/Antigravity.exe"
-          $out = "$env:TEMP\AntigravitySetup.exe"
-          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
-          Write-Host "Download selesai! Installing..."
-          Start-Process -FilePath $out -ArgumentList "/S /VERYSILENT /SUPPRESSMSGBOXES /norestart /quiet /SP-" -Wait -NoNewWindow
-          Remove-Item $out -Force -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 5
-          $exePath1 = "${env:ProgramFiles}\Google\Antigravity\Antigravity.exe"
-          $exePath2 = "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe"
-          $finalExe = if (Test-Path $exePath1) { $exePath1 } elseif (Test-Path $exePath2) { $exePath2 } else { $null }
-          if ($finalExe) {
-            $shell = New-Object -ComObject WScript.Shell
-            $sc = $shell.CreateShortcut("C:\Users\Public\Desktop\Antigravity.lnk")
-            $sc.TargetPath = $finalExe
-            $sc.Description = "Google Antigravity AI IDE"
-            $sc.Save()
-            Write-Host "Antigravity installed! Shortcut ada di Desktop."
-          } else {
-            Write-Host "WARNING: Antigravity.exe tidak ditemukan. Cek manual setelah RDP connect."
-          }
+          $desktop = "C:\Users\Public\Desktop"
+          $batFile = "$desktop\Install-Antigravity.bat"
+
+          "@echo off" | Out-File -FilePath $batFile -Encoding ASCII
+          "echo ============================================" | Add-Content -Path $batFile
+          "echo  Installing Google Antigravity IDE..." | Add-Content -Path $batFile
+          "echo  Harap tunggu, ukuran file ~500MB" | Add-Content -Path $batFile
+          "echo ============================================" | Add-Content -Path $batFile
+          "echo." | Add-Content -Path $batFile
+          "echo Downloading dari Google CDN..." | Add-Content -Path $batFile
+          "powershell -Command `"Invoke-WebRequest -Uri 'https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.21.9-4905428782546944/windows-x64/Antigravity.exe' -OutFile '%TEMP%\AntigravitySetup.exe' -UseBasicParsing`"" | Add-Content -Path $batFile
+          "echo Download selesai! Memulai instalasi..." | Add-Content -Path $batFile
+          "start /wait %TEMP%\AntigravitySetup.exe /S /VERYSILENT /SUPPRESSMSGBOXES /norestart /SP-" | Add-Content -Path $batFile
+          "del %TEMP%\AntigravitySetup.exe" | Add-Content -Path $batFile
+          "echo." | Add-Content -Path $batFile
+          "echo Antigravity berhasil diinstall!" | Add-Content -Path $batFile
+          "echo Buka dari Start Menu atau cari Antigravity di desktop." | Add-Content -Path $batFile
+          "pause" | Add-Content -Path $batFile
+
+          Write-Host "Install script created at: $batFile"
+          Write-Host "Klik 2x Install-Antigravity.bat setelah RDP connect!"
 
       # ============================================
       # STEP 6: Install Android SDK + Buat AVD
@@ -206,9 +206,24 @@ jobs:
           Write-Host "  Username : $env:RDP_USER"
           Write-Host "  Password : $env:RDP_PASS"
           Write-Host ""
-          Write-Host "  Software terinstall:"
+          Write-Host "  Software terinstall otomatis:"
           Write-Host "    [OK] Python 3.13"
           Write-Host "    [OK] Node.js 22 LTS"
+          Write-Host "    [OK] Visual Studio Code"
+          Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
+          Write-Host "    [OK] Tailscale VPN"
+          Write-Host ""
+          Write-Host "  Install manual setelah RDP connect (ada di Desktop):"
+          Write-Host "    [BAT] Install-Antigravity.bat -> klik 2x untuk install Antigravity"
+          Write-Host ""
+          Write-Host "  Cara jalankan Android Emulator:"
+          Write-Host "    Klik 2x Start-Android-Emulator.bat di Desktop"
+          Write-Host "============================================================"
+          while ($true) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif..."
+            Start-Sleep -Seconds 300
+          }
+          rite-Host "    [OK] Node.js 22 LTS"
           Write-Host "    [OK] Visual Studio Code"
           Write-Host "    [OK] Google Antigravity IDE (login Gmail setelah buka)"
           Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
