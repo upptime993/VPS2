@@ -75,18 +75,17 @@ jobs:
 
       # ============================================
       # STEP 5: Buat script install Antigravity di Desktop
-      # Antigravity TIDAK diinstall saat workflow (terlalu lambat ~500MB)
-      # Cukup klik 2x file bat ini setelah RDP connect
+      # Tidak diinstall saat workflow supaya lebih cepat
+      # Klik 2x file .bat ini setelah RDP connect
       # ============================================
       - name: Create Antigravity Installer Script on Desktop
         run: |
           $desktop = "C:\Users\Public\Desktop"
           $batFile = "$desktop\Install-Antigravity.bat"
-
           "@echo off" | Out-File -FilePath $batFile -Encoding ASCII
           "echo ============================================" | Add-Content -Path $batFile
           "echo  Installing Google Antigravity IDE..." | Add-Content -Path $batFile
-          "echo  Harap tunggu, ukuran file ~500MB" | Add-Content -Path $batFile
+          "echo  Harap tunggu, ukuran file sekitar 500MB" | Add-Content -Path $batFile
           "echo ============================================" | Add-Content -Path $batFile
           "echo." | Add-Content -Path $batFile
           "echo Downloading dari Google CDN..." | Add-Content -Path $batFile
@@ -96,16 +95,14 @@ jobs:
           "del %TEMP%\AntigravitySetup.exe" | Add-Content -Path $batFile
           "echo." | Add-Content -Path $batFile
           "echo Antigravity berhasil diinstall!" | Add-Content -Path $batFile
-          "echo Buka dari Start Menu atau cari Antigravity di desktop." | Add-Content -Path $batFile
+          "echo Buka dari Start Menu lalu login dengan akun Gmail." | Add-Content -Path $batFile
           "pause" | Add-Content -Path $batFile
-
-          Write-Host "Install script created at: $batFile"
-          Write-Host "Klik 2x Install-Antigravity.bat setelah RDP connect!"
+          Write-Host "Antigravity installer script created at Desktop!"
 
       # ============================================
       # STEP 6: Install Android SDK + Buat AVD
-      # Hyper-V tidak tersedia di GitHub runner (nested VM)
-      # Emulator tetap bisa jalan pakai software rendering (swiftshader)
+      # FIX: license accept menggunakan temporary file
+      # bukan pipe langsung (pipe kosong tidak valid di PS)
       # ============================================
       - name: Install Android SDK and Create AVD
         run: |
@@ -131,15 +128,24 @@ jobs:
           $env:Path = "$env:Path;$sdkBin;$androidHome\platform-tools;$androidHome\emulator"
 
           $sdkmanager = "$sdkBin\sdkmanager.bat"
-          Write-Host "Accepting SDK licenses..."
-          for ($i = 0; $i -lt 10; $i++) { "y" } | & $sdkmanager --licenses 2>&1 | Out-Null
+
+          # FIX: tulis "y" ke file lalu redirect file ke sdkmanager
+          # Ini cara yang benar untuk accept licenses di PowerShell
+          $yesFile = "$env:TEMP\yes.txt"
+          "y`ny`ny`ny`ny`ny`ny`ny`ny`ny" | Out-File -FilePath $yesFile -Encoding ASCII
+          Write-Host "Accepting Android SDK licenses..."
+          cmd /c "$sdkmanager --licenses < `"$yesFile`"" 2>&1 | Out-Null
+          Remove-Item $yesFile -Force
 
           Write-Host "Installing emulator + system image Android 13..."
-          & $sdkmanager "emulator" "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64" 2>&1
+          & $sdkmanager "emulator" "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
 
           Write-Host "Creating AVD: TestDevice..."
           $avdmanager = "$sdkBin\avdmanager.bat"
-          "no" | & $avdmanager create avd --name "TestDevice" --package "system-images;android-33;google_apis;x86_64" --device "pixel_6" --force 2>&1
+          $noFile = "$env:TEMP\no.txt"
+          "no" | Out-File -FilePath $noFile -Encoding ASCII
+          cmd /c "$avdmanager create avd --name TestDevice --package `"system-images;android-33;google_apis;x86_64`" --device pixel_6 --force < `"$noFile`"" 2>&1
+          Remove-Item $noFile -Force
 
           $batFile = "C:\Users\Public\Desktop\Start-Android-Emulator.bat"
           "set ANDROID_HOME=C:\Android" | Out-File -FilePath $batFile -Encoding ASCII
@@ -206,35 +212,16 @@ jobs:
           Write-Host "  Username : $env:RDP_USER"
           Write-Host "  Password : $env:RDP_PASS"
           Write-Host ""
-          Write-Host "  Software terinstall otomatis:"
+          Write-Host "  Terinstall otomatis:"
           Write-Host "    [OK] Python 3.13"
           Write-Host "    [OK] Node.js 22 LTS"
           Write-Host "    [OK] Visual Studio Code"
           Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
           Write-Host "    [OK] Tailscale VPN"
           Write-Host ""
-          Write-Host "  Install manual setelah RDP connect (ada di Desktop):"
-          Write-Host "    [BAT] Install-Antigravity.bat -> klik 2x untuk install Antigravity"
-          Write-Host ""
-          Write-Host "  Cara jalankan Android Emulator:"
-          Write-Host "    Klik 2x Start-Android-Emulator.bat di Desktop"
-          Write-Host "============================================================"
-          while ($true) {
-            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif..."
-            Start-Sleep -Seconds 300
-          }
-          rite-Host "    [OK] Node.js 22 LTS"
-          Write-Host "    [OK] Visual Studio Code"
-          Write-Host "    [OK] Google Antigravity IDE (login Gmail setelah buka)"
-          Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
-          Write-Host "    [OK] Tailscale VPN"
-          Write-Host ""
-          Write-Host "  Cara jalankan Android Emulator:"
-          Write-Host "    Klik 2x Start-Android-Emulator.bat di Desktop"
-          Write-Host "    (software rendering, tidak butuh Hyper-V)"
-          Write-Host ""
-          Write-Host "  Cara buka Antigravity:"
-          Write-Host "    Klik shortcut Antigravity di Desktop, lalu login Gmail"
+          Write-Host "  Install manual di Desktop setelah RDP connect:"
+          Write-Host "    [BAT] Install-Antigravity.bat  -> klik 2x untuk install"
+          Write-Host "    [BAT] Start-Android-Emulator.bat -> klik 2x untuk jalankan emulator"
           Write-Host "============================================================"
           while ($true) {
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] RDP aktif..."
