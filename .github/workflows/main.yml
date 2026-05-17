@@ -99,61 +99,7 @@ jobs:
           "pause" | Add-Content -Path $batFile
           Write-Host "Antigravity installer script created at Desktop!"
 
-      # ============================================
-      # STEP 6: Install Android SDK + Buat AVD
-      # FIX: license accept menggunakan temporary file
-      # bukan pipe langsung (pipe kosong tidak valid di PS)
-      # ============================================
-      - name: Install Android SDK and Create AVD
-        run: |
-          Write-Host "Setting up Android SDK..."
-          $androidHome = "C:\Android"
-          $sdkZip = "$env:TEMP\cmdtools.zip"
-          $sdkUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
 
-          Invoke-WebRequest -Uri $sdkUrl -OutFile $sdkZip -UseBasicParsing
-          New-Item -ItemType Directory -Path "$androidHome\cmdline-tools" -Force | Out-Null
-          Expand-Archive -Path $sdkZip -DestinationPath "$androidHome\cmdline-tools" -Force
-
-          $extracted = "$androidHome\cmdline-tools\cmdline-tools"
-          if (Test-Path $extracted) {
-            Rename-Item $extracted "$androidHome\cmdline-tools\latest" -Force
-          }
-
-          [System.Environment]::SetEnvironmentVariable("ANDROID_HOME", $androidHome, "Machine")
-          [System.Environment]::SetEnvironmentVariable("ANDROID_SDK_ROOT", $androidHome, "Machine")
-          $env:ANDROID_HOME = $androidHome
-          $env:ANDROID_SDK_ROOT = $androidHome
-          $sdkBin = "$androidHome\cmdline-tools\latest\bin"
-          $env:Path = "$env:Path;$sdkBin;$androidHome\platform-tools;$androidHome\emulator"
-
-          $sdkmanager = "$sdkBin\sdkmanager.bat"
-
-          # FIX: tulis "y" ke file lalu redirect file ke sdkmanager
-          # Ini cara yang benar untuk accept licenses di PowerShell
-          $yesFile = "$env:TEMP\yes.txt"
-          "y`ny`ny`ny`ny`ny`ny`ny`ny`ny" | Out-File -FilePath $yesFile -Encoding ASCII
-          Write-Host "Accepting Android SDK licenses..."
-          cmd /c "$sdkmanager --licenses < `"$yesFile`"" 2>&1 | Out-Null
-          Remove-Item $yesFile -Force
-
-          Write-Host "Installing emulator + system image Android 13..."
-          & $sdkmanager "emulator" "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
-
-          Write-Host "Creating AVD: TestDevice..."
-          $avdmanager = "$sdkBin\avdmanager.bat"
-          $noFile = "$env:TEMP\no.txt"
-          "no" | Out-File -FilePath $noFile -Encoding ASCII
-          cmd /c "$avdmanager create avd --name TestDevice --package `"system-images;android-33;google_apis;x86_64`" --device pixel_6 --force < `"$noFile`"" 2>&1
-          Remove-Item $noFile -Force
-
-          $batFile = "C:\Users\Public\Desktop\Start-Android-Emulator.bat"
-          "set ANDROID_HOME=C:\Android" | Out-File -FilePath $batFile -Encoding ASCII
-          "set PATH=%PATH%;C:\Android\emulator;C:\Android\platform-tools" | Add-Content -Path $batFile
-          "emulator -avd TestDevice -no-snapshot-load -gpu swiftshader_indirect -no-audio -no-boot-anim" | Add-Content -Path $batFile
-
-          Remove-Item $sdkZip -Force
-          Write-Host "Android SDK ready! AVD: TestDevice (Android 13, Pixel 6)"
 
       # ============================================
       # STEP 7: Install Tailscale
