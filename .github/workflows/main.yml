@@ -134,7 +134,47 @@ jobs:
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       # ============================================
-      # STEP 8: Verifikasi RDP
+      # STEP 8: Auto-Install DeeperSeeker
+      # ============================================
+      - name: Install DeeperSeeker
+        run: |
+          Write-Host "Installing DeeperSeeker..."
+          $desktop = "C:\Users\runneradmin\Desktop"
+          git clone https://github.com/AmanCode22/deeperseeker.git "$desktop\deeperseeker" 2>$null
+          cd "$desktop\deeperseeker"
+          pip install -r requirements.txt --quiet
+          python -m playwright install chromium 2>&1 | Out-Null
+          "DEEPSEEKER_API_KEY=dseeker" | Out-File -FilePath .env -Encoding ASCII
+          "DEEPSEEKER_ADMIN_USER=admin" | Add-Content -Path .env
+          "DEEPSEEKER_ADMIN_PASSWORD=admin" | Add-Content -Path .env
+          "HOST=0.0.0.0" | Add-Content -Path .env
+          "PORT=4000" | Add-Content -Path .env
+          Write-Host "    [OK] DeeperSeeker Siap di Desktop\deeperseeker"
+
+      # ============================================
+      # STEP 9: Auto-Install OpenCode
+      # ============================================
+      - name: Install OpenCode
+        run: |
+          Write-Host "Installing OpenCode..."
+          mkdir D:\opencode -Force | Out-Null
+          npm install -g opencode-ai --prefix D:\opencode 2>&1 | Out-Null
+          $env:Path += ";D:\opencode\node_modules\opencode-ai\bin"
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, "User")
+          Write-Host "    [OK] OpenCode terinstall di D:\opencode"
+
+      # ============================================
+      # STEP 10: Auto-Install Hermes Agent
+      # ============================================
+      - name: Install Hermes Agent
+        run: |
+          Write-Host "Installing Hermes Agent..."
+          pip install hermes-agent --quiet 2>&1 | Out-Null
+          Write-Host "    [OK] Hermes Agent terinstall (pip)"
+          hermes --version 2>&1 | ForEach-Object { Write-Host "    $_" }
+
+      # ============================================
+      # STEP 11: Verifikasi RDP
       # ============================================
       - name: Verify RDP Accessibility
         run: |
@@ -164,6 +204,11 @@ jobs:
           Write-Host "    [OK] Visual Studio Code"
           Write-Host "    [OK] Android SDK + AVD TestDevice (Android 13 Pixel 6)"
           Write-Host "    [OK] Tailscale VPN"
+          Write-Host ""
+          Write-Host "  Auto-installed secara otomatis:"
+          Write-Host "    [OK] DeeperSeeker (DeepSeek API proxy)"
+          Write-Host "    [OK] OpenCode (AI coding agent)"
+          Write-Host "    [OK] Hermes Agent (AI assistant)"
           Write-Host ""
           Write-Host "  Install manual di Desktop setelah RDP connect:"
           Write-Host "    [BAT] Install-Antigravity.bat  -> klik 2x untuk install"
