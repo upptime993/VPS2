@@ -157,11 +157,11 @@ jobs:
       - name: Install OpenCode
         run: |
           Write-Host "Installing OpenCode..."
-          mkdir D:\opencode -Force | Out-Null
-          npm install -g opencode-ai --prefix D:\opencode 2>&1 | Out-Null
-          $env:Path += ";D:\opencode\node_modules\opencode-ai\bin"
+          mkdir C:\opencode -Force | Out-Null
+          npm install -g opencode-ai --prefix C:\opencode 2>&1 | Out-Null
+          $env:Path += ";C:\opencode\node_modules\opencode-ai\bin"
           [Environment]::SetEnvironmentVariable("Path", $env:Path, "User")
-          Write-Host "    [OK] OpenCode terinstall di D:\opencode"
+          Write-Host "    [OK] OpenCode terinstall di C:\opencode"
 
       # ============================================
       # STEP 10: Auto-Install Hermes Agent
