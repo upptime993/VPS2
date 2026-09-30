@@ -73,32 +73,6 @@ jobs:
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
           Write-Host "VS Code installed!"
 
-      # ============================================
-      # STEP 5: Buat script install Antigravity di Desktop
-      # Tidak diinstall saat workflow supaya lebih cepat
-      # Klik 2x file .bat ini setelah RDP connect
-      # ============================================
-      - name: Create Antigravity Installer Script on Desktop
-        run: |
-          $desktop = "C:\Users\Public\Desktop"
-          $batFile = "$desktop\Install-Antigravity.bat"
-          "@echo off" | Out-File -FilePath $batFile -Encoding ASCII
-          "echo ============================================" | Add-Content -Path $batFile
-          "echo  Installing Google Antigravity IDE..." | Add-Content -Path $batFile
-          "echo  Harap tunggu, ukuran file sekitar 500MB" | Add-Content -Path $batFile
-          "echo ============================================" | Add-Content -Path $batFile
-          "echo." | Add-Content -Path $batFile
-          "echo Downloading dari Google CDN..." | Add-Content -Path $batFile
-          "powershell -Command `"Invoke-WebRequest -Uri 'https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.21.9-4905428782546944/windows-x64/Antigravity.exe' -OutFile '%TEMP%\AntigravitySetup.exe' -UseBasicParsing`"" | Add-Content -Path $batFile
-          "echo Download selesai! Memulai instalasi..." | Add-Content -Path $batFile
-          "start /wait %TEMP%\AntigravitySetup.exe /S /VERYSILENT /SUPPRESSMSGBOXES /norestart /SP-" | Add-Content -Path $batFile
-          "del %TEMP%\AntigravitySetup.exe" | Add-Content -Path $batFile
-          "echo." | Add-Content -Path $batFile
-          "echo Antigravity berhasil diinstall!" | Add-Content -Path $batFile
-          "echo Buka dari Start Menu lalu login dengan akun Gmail." | Add-Content -Path $batFile
-          "pause" | Add-Content -Path $batFile
-          Write-Host "Antigravity installer script created at Desktop!"
-
 
 
       # ============================================
@@ -133,23 +107,6 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      # ============================================
-      # STEP 8: Auto-Install DeeperSeeker
-      # ============================================
-      - name: Install DeeperSeeker
-        run: |
-          Write-Host "Installing DeeperSeeker..."
-          $desktop = "C:\Users\runneradmin\Desktop"
-          git clone https://github.com/AmanCode22/deeperseeker.git "$desktop\deeperseeker" 2>$null
-          cd "$desktop\deeperseeker"
-          pip install -r requirements.txt --quiet
-          python -m playwright install chromium 2>&1 | Out-Null
-          "DEEPSEEKER_API_KEY=dseeker" | Out-File -FilePath .env -Encoding ASCII
-          "DEEPSEEKER_ADMIN_USER=admin" | Add-Content -Path .env
-          "DEEPSEEKER_ADMIN_PASSWORD=admin" | Add-Content -Path .env
-          "HOST=0.0.0.0" | Add-Content -Path .env
-          "PORT=4000" | Add-Content -Path .env
-          Write-Host "    [OK] DeeperSeeker Siap di Desktop\deeperseeker"
 
       # ============================================
       # STEP 9: Auto-Install OpenCode
@@ -163,15 +120,6 @@ jobs:
           [Environment]::SetEnvironmentVariable("Path", $env:Path, "User")
           Write-Host "    [OK] OpenCode terinstall di C:\opencode"
 
-      # ============================================
-      # STEP 10: Auto-Install Hermes Agent
-      # ============================================
-      - name: Install Hermes Agent
-        run: |
-          Write-Host "Installing Hermes Agent..."
-          pip install hermes-agent --quiet 2>&1 | Out-Null
-          Write-Host "    [OK] Hermes Agent terinstall (pip)"
-          hermes --version 2>&1 | ForEach-Object { Write-Host "    $_" }
 
       # ============================================
       # STEP 11: Verifikasi RDP
